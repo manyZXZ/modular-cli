@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { readPathIdentity, sameFilesystemIdentity as sameFileIdentity } from "./file-identity.js";
 import { redactSensitiveText } from "./sanitize.js";
 import { createFinding } from "./model.js";
 import { SCAN_MODULES } from "./modules.js";
@@ -186,14 +187,10 @@ function validateBaselineDocument(value, source = "baseline") {
   };
 }
 
-function sameFileIdentity(left, right) {
-  return Boolean(left && right) && left.dev === right.dev && left.ino === right.ino;
-}
-
 async function readRegularJsonRecord(filePath, maximumBytes, label) {
   let stat;
   try {
-    stat = await fs.lstat(filePath);
+    stat = await readPathIdentity(filePath);
   } catch (error) {
     if (error?.code === "ENOENT") {
       const missing = new Error(`${label} does not exist: ${filePath}`);
@@ -211,7 +208,7 @@ async function readRegularJsonRecord(filePath, maximumBytes, label) {
   let text;
   try {
     handle = await fs.open(filePath, "r");
-    opened = await handle.stat();
+    opened = await handle.stat({ bigint: true });
     if (!opened.isFile() || !sameFileIdentity(stat, opened)) {
       throw new TypeError(`${label} changed while it was being opened: ${filePath}`);
     }
@@ -220,7 +217,7 @@ async function readRegularJsonRecord(filePath, maximumBytes, label) {
     if (Buffer.byteLength(text, "utf8") > maximumBytes) {
       throw new TypeError(`${label} exceeds the ${maximumBytes}-byte safety limit.`);
     }
-    const current = await fs.lstat(filePath);
+    const current = await readPathIdentity(filePath);
     if (!current.isFile() || current.isSymbolicLink() || !sameFileIdentity(opened, current)) {
       throw new TypeError(`${label} changed while it was being read: ${filePath}`);
     }
@@ -515,19 +512,22 @@ function baselineLockPath(target) {
 async function readBaselineLock(lockPath) {
   let stat;
   try {
-    stat = await fs.lstat(lockPath);
+    stat = await readPathIdentity(lockPath);
   } catch (error) {
     if (error?.code === "ENOENT") return null;
+    // A concurrent owner can still be writing its durable lock record.
+    // An unstable identity is an unverified existing lock, never a stale one.
+    if (error?.code === "FILE_IDENTITY_CHANGED") return { stat: null, owner: null };
     throw error;
   }
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_LOCK_BYTES) return { stat, owner: null };
   let handle;
   try {
     handle = await fs.open(lockPath, "r");
-    const opened = await handle.stat();
+    const opened = await handle.stat({ bigint: true });
     if (!sameFileIdentity(stat, opened) || opened.size > MAX_LOCK_BYTES) return { stat: opened, owner: null };
     const owner = JSON.parse(await handle.readFile("utf8"));
-    const current = await fs.lstat(lockPath);
+    const current = await readPathIdentity(lockPath);
     if (!current.isFile() || current.isSymbolicLink() || !sameFileIdentity(opened, current)) {
       return { stat: current, owner: null };
     }
@@ -551,7 +551,7 @@ async function recoverStaleBaselineLock(lockPath, staleMs) {
   const observed = await readBaselineLock(lockPath);
   if (!observed) return true;
   if (!observed.owner) return false;
-  const age = Date.now() - Math.max(observed.owner.createdAt, observed.stat.mtimeMs);
+  const age = Date.now() - Math.max(observed.owner.createdAt, Number(observed.stat.mtimeMs));
   if (age < staleMs || observed.owner.hostname !== os.hostname() || processIsAlive(observed.owner.pid)) return false;
   const current = await readBaselineLock(lockPath);
   if (!current
@@ -608,18 +608,18 @@ async function acquireBaselineLock(target, options) {
       delay = Math.min(200, Math.ceil(delay * 1.5));
       continue;
     }
-    const stat = await handle.stat();
+    const stat = await handle.stat({ bigint: true });
     try {
       await handle.writeFile(`${JSON.stringify(owner)}\n`, "utf8");
       await handle.sync();
-      const current = await fs.lstat(lockPath);
+      const current = await readPathIdentity(lockPath);
       if (!current.isFile() || current.isSymbolicLink() || !sameFileIdentity(stat, current)) {
         throw new Error(`Baseline lock changed while it was being acquired: ${lockPath}`);
       }
       return { handle, lockPath, owner, stat };
     } catch (error) {
       await handle.close().catch(() => {});
-      const current = await fs.lstat(lockPath).catch(() => null);
+      const current = await readPathIdentity(lockPath).catch(() => null);
       if (sameFileIdentity(stat, current)) await fs.unlink(lockPath).catch(() => {});
       throw error;
     }
@@ -684,7 +684,7 @@ async function removeIfIdentity(filePath, expectedStat) {
   if (!filePath) return;
   let current;
   try {
-    current = await fs.lstat(filePath);
+    current = await readPathIdentity(filePath);
   } catch (error) {
     if (error?.code === "ENOENT") return;
     throw error;
@@ -706,7 +706,7 @@ async function commitBaseline(target, content, currentRecord) {
   let handle;
   try {
     handle = await fs.open(temporary, "wx", 0o600);
-    temporaryStat = await handle.stat();
+    temporaryStat = await handle.stat({ bigint: true });
     await handle.writeFile(content, "utf8");
     await handle.sync();
     await handle.close();
@@ -750,7 +750,7 @@ async function commitBaseline(target, content, currentRecord) {
     }
     if (backupStat) {
       try {
-        const currentBackup = await fs.lstat(backup);
+        const currentBackup = await readPathIdentity(backup);
         if (!currentBackup.isFile() || currentBackup.isSymbolicLink()
           || !sameFileIdentity(backupStat, currentBackup)) {
           throw new Error(`Refusing to restore a baseline transaction backup whose identity changed: ${backup}`);

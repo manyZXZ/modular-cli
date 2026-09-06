@@ -1,6 +1,7 @@
 import { constants as fsConstants, promises as fs } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
+import { fileDeviceKey, readPathIdentity, sameFilesystemIdentity } from "./file-identity.js";
 
 export const DEFAULT_IGNORED_DIRECTORIES = new Set([
   ".git",
@@ -107,7 +108,7 @@ function fileIdentity(stat) {
       : String(Math.round(Number(milliseconds) * 1_000_000))
   );
   return {
-    dev: String(stat.dev),
+    dev: fileDeviceKey(stat.dev),
     ino: String(stat.ino),
     size: Number(stat.size),
     mtimeNs: timestamp(stat.mtimeNs, stat.mtimeMs),
@@ -116,8 +117,8 @@ function fileIdentity(stat) {
 }
 
 function sameFileIdentity(left, right) {
-  if (!left || !right) return false;
-  return ["dev", "ino", "size", "mtimeNs", "ctimeNs"]
+  if (!sameFilesystemIdentity(left, right)) return false;
+  return ["size", "mtimeNs", "ctimeNs"]
     .every((key) => left[key] !== undefined && right[key] !== undefined && left[key] === right[key]);
 }
 
@@ -278,7 +279,7 @@ export async function collectFiles(root, options = {}) {
       }
 
       try {
-        const stat = await fs.lstat(absolute, { bigint: true });
+        const stat = await readPathIdentity(absolute);
         const size = Number(stat.size);
         if (stat.isSymbolicLink()) {
           skipped.links += 1;
@@ -398,7 +399,7 @@ export async function verifyFileMetadata(file, options = {}) {
     const candidate = path.resolve(file.absolute);
     const canonical = await safeCanonicalFile(root, candidate);
     if (!canonical) return null;
-    const stat = await fs.lstat(candidate, { bigint: true });
+    const stat = await readPathIdentity(candidate);
     if (!stat.isFile() || stat.isSymbolicLink()) return null;
     const identity = fileIdentity(stat);
     if (!sameFileIdentity(file.identity, identity)) return null;
@@ -421,7 +422,7 @@ export async function readTextFile(file, options = {}) {
     const root = options.root === undefined ? null : path.resolve(String(options.root));
     const initialCanonical = root ? await safeCanonicalFile(root, candidate) : null;
     if (root && !initialCanonical) return null;
-    const lexical = await fs.lstat(candidate, { bigint: true });
+    const lexical = await readPathIdentity(candidate);
     if (!lexical.isFile() || lexical.isSymbolicLink()) return null;
 
     const noFollow = fsConstants.O_NOFOLLOW ?? 0;

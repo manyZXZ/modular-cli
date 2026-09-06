@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { readPathIdentity, sameFilesystemIdentity as sameFileIdentity } from "./file-identity.js";
 import { findingFingerprint, fingerprintFindings } from "./policy.js";
 import { SCAN_MODULES } from "./modules.js";
 
@@ -275,7 +276,7 @@ export function createSarifReport(results, { toolVersion = "unknown", complete =
 export async function isOwnedMachineReport(filePath, format = null) {
   let stat;
   try {
-    stat = await fs.lstat(filePath);
+    stat = await readPathIdentity(filePath);
   } catch (error) {
     if (error?.code === "ENOENT") return true;
     throw error;
@@ -285,10 +286,10 @@ export async function isOwnedMachineReport(filePath, format = null) {
   let handle;
   try {
     handle = await fs.open(filePath, "r");
-    const opened = await handle.stat();
+    const opened = await handle.stat({ bigint: true });
     if (!sameFileIdentity(stat, opened) || opened.size > MAX_OWNERSHIP_CHECK_BYTES) return false;
     value = JSON.parse(await handle.readFile("utf8"));
-    const current = await fs.lstat(filePath);
+    const current = await readPathIdentity(filePath);
     if (!sameFileIdentity(opened, current) || current.isSymbolicLink()) return false;
   } catch {
     return false;
@@ -305,10 +306,6 @@ export async function isOwnedMachineReport(filePath, format = null) {
   return value?.schemaVersion === MACHINE_SCHEMA_VERSION
     && value?.kind === "scan-results"
     && value?.tool?.name === "Modular";
-}
-
-function sameFileIdentity(left, right) {
-  return Boolean(left && right) && left.dev === right.dev && left.ino === right.ino;
 }
 
 function processIsAlive(pid) {
@@ -333,19 +330,22 @@ function lockOption(value, fallback, name) {
 async function readMachineLock(lockPath) {
   let stat;
   try {
-    stat = await fs.lstat(lockPath);
+    stat = await readPathIdentity(lockPath);
   } catch (error) {
     if (error?.code === "ENOENT") return null;
+    // In-progress owner writes can change a verified pathname snapshot. Keep
+    // the lock unverified until a later retry; never treat it as absent/stale.
+    if (error?.code === "FILE_IDENTITY_CHANGED") return { stat: null, owner: null };
     throw error;
   }
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 4096) return { stat, owner: null };
   let handle;
   try {
     handle = await fs.open(lockPath, "r");
-    const opened = await handle.stat();
+    const opened = await handle.stat({ bigint: true });
     if (!sameFileIdentity(stat, opened)) return { stat: opened, owner: null };
     const owner = JSON.parse(await handle.readFile("utf8"));
-    const current = await fs.lstat(lockPath);
+    const current = await readPathIdentity(lockPath);
     if (!sameFileIdentity(opened, current)) return { stat: current, owner: null };
     const valid = owner?.marker === MACHINE_REPORT_LOCK_MARKER
       && typeof owner.token === "string"
@@ -367,7 +367,7 @@ async function recoverStaleMachineLock(lockPath, staleMs) {
   const observed = await readMachineLock(lockPath);
   if (!observed) return true;
   if (!observed.owner) return false;
-  const age = Date.now() - Math.max(observed.owner.createdAt, observed.stat.mtimeMs);
+  const age = Date.now() - Math.max(observed.owner.createdAt, Number(observed.stat.mtimeMs));
   if (age < staleMs || observed.owner.hostname !== os.hostname() || processIsAlive(observed.owner.pid)) return false;
   const current = await readMachineLock(lockPath);
   if (!current
@@ -416,18 +416,18 @@ async function acquireMachineLock(outputDirectory, options) {
       delay = Math.min(200, Math.ceil(delay * 1.5));
       continue;
     }
-    const stat = await handle.stat();
+    const stat = await handle.stat({ bigint: true });
     try {
       await handle.writeFile(`${JSON.stringify(owner)}\n`, "utf8");
       await handle.sync();
-      const current = await fs.lstat(lockPath);
+      const current = await readPathIdentity(lockPath);
       if (!current.isFile() || current.isSymbolicLink() || !sameFileIdentity(stat, current)) {
         throw new Error(`Machine-report lock changed while it was being acquired: ${lockPath}`);
       }
       return { handle, lockPath, owner, stat };
     } catch (error) {
       await handle.close().catch(() => {});
-      const current = await fs.lstat(lockPath).catch(() => null);
+      const current = await readPathIdentity(lockPath).catch(() => null);
       if (sameFileIdentity(stat, current)) await fs.unlink(lockPath).catch(() => {});
       throw error;
     }

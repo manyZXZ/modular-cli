@@ -30,6 +30,8 @@ All notable user-facing changes to Modular are recorded here. This project follo
 
 ### Changed
 
+- Windows filesystem identity checks retain exact inode and snapshot validation while handling older Node.js/libuv stat inconsistencies in scans, report writers, baselines and static previews.
+- Chromium integration CI grants user-namespace access only to the pinned browser executables on its disposable Ubuntu runner, preserving Chromium's sandbox and the system-wide AppArmor restriction.
 - Failed Markdown and JSON/SARIF rollback preserves recovery backups and reports their paths instead of deleting the last copy of earlier results.
 - Security source masking preserves UTF-16 positions; URL guard inference rejects stale values and conditionally executed validation.
 - Dependency privacy checks accept valid integrity hashes containing Base64 slashes, and Windows dependency audits recognize standard npm-generated package-manager shims.

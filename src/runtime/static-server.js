@@ -1,6 +1,7 @@
 import { constants as fsConstants, promises as fs } from "node:fs";
 import http from "node:http";
 import path from "node:path";
+import { readPathIdentity, sameFilesystemIdentity } from "../core/file-identity.js";
 
 const DEFAULT_STARTUP_TIMEOUT_MS = 5_000;
 const DEFAULT_CLOSE_TIMEOUT_MS = 5_000;
@@ -188,7 +189,7 @@ async function assertSafeAsset(staticRoot, candidate) {
   if (!isWithin(staticRoot, real)) {
     throw new RuntimeStaticServerError("UNSAFE_STATIC_ASSET", "The requested asset resolves outside the static directory.");
   }
-  const stat = await fs.stat(real);
+  const stat = await readPathIdentity(real, { followLinks: true });
   if (!stat.isFile()) throw Object.assign(new Error("Not a regular file"), { code: "ENOENT" });
   if (stat.size > MAX_STATIC_FILE_BYTES) {
     throw new RuntimeStaticServerError(
@@ -328,8 +329,8 @@ export async function startRuntimeStaticServer({
       try {
         const noFollow = fsConstants.O_NOFOLLOW ?? 0;
         handle = await fs.open(asset.real, fsConstants.O_RDONLY | noFollow);
-        const openedStat = await handle.stat();
-        if (!openedStat.isFile() || openedStat.dev !== asset.stat.dev || openedStat.ino !== asset.stat.ino) {
+        const openedStat = await handle.stat({ bigint: true });
+        if (!openedStat.isFile() || !sameFilesystemIdentity(openedStat, asset.stat)) {
           throw new RuntimeStaticServerError("STATIC_ASSET_CHANGED", "The requested asset changed during validation.");
         }
         const openedHandle = handle;

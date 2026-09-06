@@ -2,6 +2,7 @@ import { constants as fsConstants, promises as fs } from "node:fs";
 import { randomUUID } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
+import { readPathIdentity, sameFilesystemIdentity as sameFileIdentity } from "../file-identity.js";
 import {
   DEFAULT_REPORT_LOCK_STALE_MS,
   DEFAULT_REPORT_LOCK_TIMEOUT_MS,
@@ -63,7 +64,7 @@ export async function prepareOutputDirectory(repositoryRoot, outputDirectory) {
   if (enforceRepositoryBoundary && !pathInsideOrEqual(realRoot, baselineRealOutput)) {
     throw unsafeOutputError(lexicalOutput);
   }
-  const baseline = await fs.stat(lexicalOutput);
+  const baseline = await fs.stat(lexicalOutput, { bigint: true });
   if (!baseline.isDirectory()) throw new Error(`Report output path is not a directory: ${lexicalOutput}`);
 
   return async function validateOutputDirectory(candidateFile = null) {
@@ -71,14 +72,13 @@ export async function prepareOutputDirectory(repositoryRoot, outputDirectory) {
     let current;
     try {
       currentRealOutput = await fs.realpath(lexicalOutput);
-      current = await fs.stat(lexicalOutput);
+      current = await fs.stat(lexicalOutput, { bigint: true });
     } catch {
       throw unsafeOutputError(lexicalOutput);
     }
     if (!current.isDirectory()
       || path.relative(baselineRealOutput, currentRealOutput) !== ""
-      || current.dev !== baseline.dev
-      || current.ino !== baseline.ino
+      || !sameFileIdentity(current, baseline)
       || (enforceRepositoryBoundary && !pathInsideOrEqual(realRoot, currentRealOutput))) {
       throw unsafeOutputError(lexicalOutput);
     }
@@ -108,10 +108,6 @@ function reportLockOption(value, fallback, name, minimum, maximum) {
   return value;
 }
 
-function sameFileIdentity(left, right) {
-  return Boolean(left && right) && left.dev === right.dev && left.ino === right.ino;
-}
-
 function processIsAlive(pid) {
   if (!Number.isSafeInteger(pid) || pid <= 0) return null;
   if (pid === process.pid) return true;
@@ -129,9 +125,12 @@ function processIsAlive(pid) {
 async function readReportLock(lockPath) {
   let stat;
   try {
-    stat = await fs.lstat(lockPath);
+    stat = await readPathIdentity(lockPath);
   } catch (error) {
     if (error?.code === "ENOENT") return null;
+    // A writer may still be filling its exclusively created lock. An unstable
+    // snapshot is an existing, unverified lock: wait, never reap it as stale.
+    if (error?.code === "FILE_IDENTITY_CHANGED") return { stat: null, owner: null };
     throw error;
   }
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 4096) return { stat, owner: null };
@@ -158,7 +157,7 @@ async function recoverStaleReportLock(lockPath, validateOutput, staleMs) {
   if (!observed) return true;
   if (!observed.owner) return false;
   const owner = observed.owner;
-  const age = Date.now() - Math.max(owner.createdAt, observed.stat.mtimeMs);
+  const age = Date.now() - Math.max(owner.createdAt, Number(observed.stat.mtimeMs));
   if (age < staleMs || owner.hostname !== os.hostname() || processIsAlive(owner.pid) !== false) return false;
 
   // Re-read immediately before unlinking so a changed owner or inode is never
@@ -210,19 +209,19 @@ async function acquireReportLock(outputDirectory, validateOutput, options) {
       continue;
     }
 
-    const acquiredStat = await handle.stat();
+    const acquiredStat = await handle.stat({ bigint: true });
     try {
       await handle.writeFile(`${JSON.stringify(owner)}\n`, "utf8");
       await handle.sync();
       await validateOutput(lockPath);
-      const current = await fs.lstat(lockPath);
+      const current = await readPathIdentity(lockPath);
       if (!current.isFile() || current.isSymbolicLink() || !sameFileIdentity(acquiredStat, current)) {
         throw new Error(`Modular report lock changed while it was being acquired: ${lockPath}`);
       }
       return { handle, lockPath, owner, stat: acquiredStat };
     } catch (error) {
       await handle.close().catch(() => {});
-      const current = await fs.lstat(lockPath).catch(() => null);
+      const current = await readPathIdentity(lockPath).catch(() => null);
       if (sameFileIdentity(acquiredStat, current)) await fs.unlink(lockPath).catch(() => {});
       throw error;
     }

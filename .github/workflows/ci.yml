@@ -83,5 +83,19 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npx --no-install playwright install --with-deps chromium
+      - name: Enable sandboxed Chromium on Ubuntu
+        # Exact binary attachments only; do not disable Chromium's sandbox or
+        # Ubuntu's system-wide unprivileged-user-namespace restriction.
+        run: |
+          node scripts/ci/chromium-sandbox-profile.js > "$RUNNER_TEMP/modular-ci-chromium.apparmor"
+          sudo install -o root -g root -m 0644 "$RUNNER_TEMP/modular-ci-chromium.apparmor" /etc/apparmor.d/modular-ci-chromium
+          sudo apparmor_parser --replace /etc/apparmor.d/modular-ci-chromium
       - run: npm run test:browser
       - run: npm run test:accuracy
+      - name: Remove CI-only Chromium sandbox profile
+        if: always()
+        run: |
+          if [ -f /etc/apparmor.d/modular-ci-chromium ]; then
+            sudo apparmor_parser --remove /etc/apparmor.d/modular-ci-chromium
+            sudo rm -- /etc/apparmor.d/modular-ci-chromium
+          fi

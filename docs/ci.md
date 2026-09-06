@@ -106,6 +106,8 @@ Keep static preview observations separate from claims about production headers, 
 
 Modular's own workflow tests its implementation rather than auditing this CLI repository as a website. It runs core tests on Windows, Linux and macOS, checks the public package API, installs the archive offline and tests the demo scan and threshold behavior. A separate job runs real Chromium/Axe and the labeled accuracy corpus.
 
+The Chromium job keeps the browser sandbox enabled. On its disposable GitHub-hosted Ubuntu runner, a CI-only AppArmor profile permits user namespaces for the exact installed Playwright Chromium and headless-shell executables. The profile is removed after the job's tests; it does not disable Ubuntu's system-wide restriction or modify users' computers. The profile generator refuses local and self-hosted execution. Other browser CI environments need their own reviewed, sandbox-capable setup.
+
 To run the local release gate, follow [Contributing](../CONTRIBUTING.md). To publish the source repository or an npm release, use [GitHub setup](./GITHUB.md) and [Releasing](../RELEASING.md).
 
 [Documentation index](./README.md) · [CLI reference](./cli.md)
