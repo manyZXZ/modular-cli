@@ -1,0 +1,34 @@
+name: Feature request
+description: Propose a focused improvement to Modular
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What workflow or evidence gap should Modular address?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the command, output, rule or API behavior you expect.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: examples
+    attributes:
+      label: Safe examples or references
+      description: Do not include private repositories, credentials or sensitive reports.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This remains a website-repository audit feature and does not require Modular to edit application source.
+          required: true

@@ -1,0 +1,68 @@
+name: Bug report
+description: Report a reproducible problem in Modular
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Do not include credentials, private source, or sensitive generated reports. Security-boundary issues must use a private security advisory as described in SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Modular version
+      description: Run `modular --version`.
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Include the operating system, terminal, Node.js version and package manager.
+      placeholder: Windows 11, PowerShell 7, Node.js 24.x, npm 11.x
+    validations:
+      required: true
+  - type: dropdown
+    id: command
+    attributes:
+      label: Command
+      options:
+        - check security
+        - check mysite
+        - check all
+        - installation or package API
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide exact sanitized steps and the smallest safe fixture that reproduces the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the exit code. Set `MODULAR_DEBUG=1` only if the output is safe to share.
+      render: shell
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I searched existing issues and tested the latest supported release.
+          required: true
+        - label: I removed secrets, private source and sensitive report evidence.
+          required: true
+        - label: This is not a confidential vulnerability report.
+          required: true

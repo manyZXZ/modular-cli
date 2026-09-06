@@ -1,0 +1,37 @@
+node_modules/
+coverage/
+dist/
+.DS_Store
+*.log
+*.tgz
+.npm/
+.eslintcache
+.nyc_output/
+
+# Modular creates this in repositories being scanned.
+Modular/
+
+# Local release/runtime verification artifacts.
+.runtime-smoke-output/
+.security-smoke-output/
+.final-smoke-output/
+.npm-cache*/
+.package-smoke/
+
+# Private audits and local release evidence are never repository content.
+/audit/
+/.release-output/
+/.demo-output/
+/.repo-export/
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+.npmrc
+.pnpmfile.cjs
+.yarnrc.yml
+.idea/
+.vscode/
+Thumbs.db

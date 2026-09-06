@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unpkg.com/modular-check/modular.schema.json",
+  "title": "Modular project configuration",
+  "description": "Project-local policy for Modular repository scans. Network and browser audits remain CLI-only opt-ins.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "failOn": {
+      "$ref": "#/$defs/threshold",
+      "description": "Fail with exit code 3 when an unsuppressed finding at or above this severity exists."
+    },
+    "failOnNew": {
+      "$ref": "#/$defs/threshold",
+      "description": "Fail with exit code 3 only for unsuppressed baseline-new findings at or above this severity. Requires baseline."
+    },
+    "baseline": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Repository-relative Modular baseline file."
+    },
+    "ignore": {
+      "type": "array",
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^[^/\\\\]+$"
+      },
+      "description": "Exact directory names to exclude wherever they occur."
+    },
+    "maxFindingsPerRule": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "outputFormats": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "json",
+          "sarif"
+        ]
+      },
+      "description": "Additional machine-readable artifacts written beside the Markdown reports."
+    },
+    "suppressions": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rule",
+          "reason"
+        ],
+        "properties": {
+          "rule": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Finding rule id glob, for example security.secret-* or site.meta-description."
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Optional repository-relative file glob."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 1000,
+            "description": "Auditable accepted-risk or false-positive rationale."
+          },
+          "expires": {
+            "type": "string",
+            "format": "date",
+            "description": "Optional last valid date; expired entries automatically stop suppressing."
+          }
+        }
+      }
+    },
+    "failOnRegression": {
+      "$ref": "#/$defs/threshold",
+      "description": "Gate new findings or increased severity against a required baseline."
+    },
+    "failOnIncomplete": {
+      "type": "boolean",
+      "description": "Exit 1 when discovered source files could not be fully inspected."
+    }
+  },
+  "$defs": {
+    "threshold": {
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low",
+        "info",
+        "none"
+      ]
+    }
+  }
+}

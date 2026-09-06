@@ -1,0 +1,92 @@
+{
+  "name": "modular-check",
+  "version": "0.1.0",
+  "description": "Evidence-backed security, accessibility, SEO and runtime audits for web application repositories.",
+  "author": "Modular contributors",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "bin": {
+    "modular": "bin/modular.js"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./cli": "./src/cli.js",
+    "./runtime": "./src/runtime/index.js",
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "cli": [
+        "src/cli.d.ts"
+      ],
+      "runtime": [
+        "src/runtime/index.d.ts"
+      ],
+      "*": [
+        "src/index.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "bin",
+    "src",
+    "assets",
+    "docs",
+    "examples/README.md",
+    "examples/modular.config.json",
+    "examples/basic-site/index.html",
+    "examples/basic-site/legacy-widget.js",
+    "modular.schema.json",
+    "scripts/generate-terminal-logo.py",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
+    "RELEASING.md"
+  ],
+  "scripts": {
+    "demo": "node ./bin/modular.js check all --root examples/basic-site --json --sarif --no-color",
+    "smoke": "node ./bin/modular.js --help",
+    "test": "node --test --test-concurrency=1",
+    "test:types": "tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext --lib ES2022,DOM --skipLibCheck false type-tests/public-api.ts",
+    "test:accuracy": "node ./scripts/check-accuracy.js",
+    "test:browser": "node ./scripts/verify-browser.js",
+    "test:coverage": "node --test --experimental-test-coverage --test-concurrency=1",
+    "package:check": "node ./scripts/verify-package.js",
+    "package:smoke": "node ./scripts/verify-install.js",
+    "repo:check": "node ./scripts/verify-repository.js",
+    "release:check": "npm run repo:check && npm test && npm run test:types && npm run smoke && npm run package:check && npm run package:smoke",
+    "prepublishOnly": "npm run release:check"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "playwright": "1.63.0",
+    "typescript": "5.9.2"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "keywords": [
+    "security",
+    "security-scanner",
+    "sast",
+    "sarif",
+    "frontend",
+    "accessibility",
+    "wcag",
+    "seo",
+    "core-web-vitals",
+    "web-quality",
+    "audit",
+    "cli"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

@@ -1,0 +1,262 @@
+{
+  "schemaVersion": 1,
+  "description": "Selected labeled regression cases; not a representative estimate of general accuracy.",
+  "cases": [
+    {
+      "id": "unicode-preserves-dataflow-offsets/vulnerable-emoji-prefix",
+      "rule": "security.server-ssrf",
+      "expected": 1,
+      "code": "const icon = '🔍';\nexport async function handler(req) {\n  const target = new URL(req.query.url);\n  return fetch(target);\n}",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "unicode-preserves-dataflow-offsets/safe-control-emoji-and-host-guard",
+      "rule": "security.server-ssrf",
+      "expected": 0,
+      "code": "const icon = '🔍';\nexport async function handler(req) {\n  const target = new URL(req.query.url);\n  if (target.hostname !== 'safe.example') return;\n  return fetch(target);\n}",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "url-guard-follows-current-value/vulnerable-reassignment-after-guard",
+      "rule": "security.server-ssrf",
+      "expected": 1,
+      "code": "export async function handler(req) {\n  let target = new URL(req.query.url);\n  if (target.hostname !== 'safe.example') return;\n  target = new URL(req.query.other);\n  return fetch(target);\n}",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "url-guard-follows-current-value/safe-control-revalidated-value",
+      "rule": "security.server-ssrf",
+      "expected": 0,
+      "code": "export async function handler(req) {\n  let target = new URL(req.query.url);\n  target = new URL(req.query.other);\n  if (target.hostname !== 'safe.example') return;\n  return fetch(target);\n}",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "url-guard-dominates-sink/vulnerable-conditional-host-guard",
+      "rule": "security.server-ssrf",
+      "expected": 1,
+      "code": "export async function handler(req) {\n  const target = new URL(req.query.url);\n  if (ENFORCE) {\n    if (target.hostname !== 'safe.example') return;\n  }\n  return fetch(target);\n}",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "url-guard-dominates-sink/safe-control-sink-inside-guarded-branch",
+      "rule": "security.server-ssrf",
+      "expected": 0,
+      "code": "export async function handler(req) {\n  const target = new URL(req.query.url);\n  if (ENFORCE) {\n    if (target.hostname !== 'safe.example') return;\n    return fetch(target);\n  }\n}",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "url-base-does-not-constrain-origin/vulnerable-absolute-input-with-base",
+      "rule": "security.server-ssrf",
+      "expected": 1,
+      "code": "export async function handler(req) {\n  const target = req.query.url;\n  return fetch(new URL(target, 'https://safe.example/'));\n}",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "url-base-does-not-constrain-origin/positive-control-direct-input",
+      "rule": "security.server-ssrf",
+      "expected": 1,
+      "code": "export async function handler(req) { return fetch(req.query.url); }",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "url-base-does-not-constrain-origin/safe-control-fixed-origin-query-value",
+      "rule": "security.server-ssrf",
+      "expected": 0,
+      "code": "export async function handler(req) { return fetch(`https://safe.example/search?q=${encodeURIComponent(req.query.term)}`); }",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "filename-wildcard-count-is-not-an-allowlist/vulnerable-bounded-wildcard-guard",
+      "rule": "security.server-path-traversal",
+      "expected": 1,
+      "code": "import { readFile } from 'node:fs';\nexport function handler(req) {\n  const name = req.params.name;\n  if (!/^.{1,100}$/.test(name)) return;\n  readFile(name, () => {});\n}",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "filename-wildcard-count-is-not-an-allowlist/positive-control-unguarded-path",
+      "rule": "security.server-path-traversal",
+      "expected": 1,
+      "code": "import { readFile } from 'node:fs'; export function handler(req) { readFile(req.params.name, () => {}); }",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "filename-wildcard-count-is-not-an-allowlist/safe-control-strict-filename",
+      "rule": "security.server-path-traversal",
+      "expected": 0,
+      "code": "import { readFile } from 'node:fs';\nexport function handler(req) {\n  const name = req.params.name;\n  if (!/^[a-z0-9_-]{1,100}$/.test(name)) return;\n  readFile(name, () => {});\n}",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "nested-conditional-return-is-not-a-terminating-guard/vulnerable-conditionally-returning-guard",
+      "rule": "security.server-ssrf",
+      "expected": 1,
+      "code": "export async function handler(req) {\n  const target = new URL(req.query.url);\n  if (target.hostname !== 'safe.example') {\n    if (AUDIT_ONLY) return;\n  }\n  return fetch(target);\n}",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "nested-conditional-return-is-not-a-terminating-guard/positive-control-no-host-guard",
+      "rule": "security.server-ssrf",
+      "expected": 1,
+      "code": "export async function handler(req) { const target = new URL(req.query.url); return fetch(target); }",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "nested-conditional-return-is-not-a-terminating-guard/safe-control-terminating-host-guard",
+      "rule": "security.server-ssrf",
+      "expected": 0,
+      "code": "export async function handler(req) {\n  const target = new URL(req.query.url);\n  if (target.hostname !== 'safe.example') return;\n  return fetch(target);\n}",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "jwt-options-use-unparsed-text-and-single-element-arrays/false-positive-harmless-help-string",
+      "rule": "security.jwt-validation",
+      "expected": 0,
+      "code": "import jwt from 'jsonwebtoken';\nconst help = 'Use ignoreExpiration: true only for tests';\nexport const claims = jwt.verify(token, key);",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "jwt-options-use-unparsed-text-and-single-element-arrays/false-negative-multiple-allowed-algorithms",
+      "rule": "security.jwt-validation",
+      "expected": 1,
+      "code": "import jwt from 'jsonwebtoken';\nexport const claims = jwt.verify(token, undefined, { algorithms: ['HS256', 'none'] });",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "jwt-options-use-unparsed-text-and-single-element-arrays/positive-control-none-only",
+      "rule": "security.jwt-validation",
+      "expected": 1,
+      "code": "import jwt from 'jsonwebtoken'; export const claims = jwt.verify(token, undefined, { algorithms: ['none'] });",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "jwt-options-use-unparsed-text-and-single-element-arrays/safe-control-enforced-verification",
+      "rule": "security.jwt-validation",
+      "expected": 0,
+      "code": "import jwt from 'jsonwebtoken'; export const claims = jwt.verify(token, key, { algorithms: ['RS256'], ignoreExpiration: false });",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "local-reassignments-are-not-tracked/false-negative-later-tainted-assignment",
+      "rule": "security.server-ssrf",
+      "expected": 1,
+      "code": "export async function handler(req) { let target = 'https://safe.example/'; target = req.query.url; return fetch(target); }",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "local-reassignments-are-not-tracked/false-positive-later-fixed-assignment",
+      "rule": "security.server-ssrf",
+      "expected": 0,
+      "code": "export async function handler(req) { let target = req.query.url; target = 'https://safe.example/'; return fetch(target); }",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "local-reassignments-are-not-tracked/positive-control-initially-tainted",
+      "rule": "security.server-ssrf",
+      "expected": 1,
+      "code": "export async function handler(req) { const target = req.query.url; return fetch(target); }",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "local-reassignments-are-not-tracked/safe-control-initially-fixed",
+      "rule": "security.server-ssrf",
+      "expected": 0,
+      "code": "export async function handler(req) { const target = 'https://safe.example/'; return fetch(target); }",
+      "framework": "node-server",
+      "partition": "regression"
+    },
+    {
+      "id": "validation/bracket-dot-safe",
+      "rule": "security.server-path-traversal",
+      "expected": 0,
+      "code": "import {readFile} from 'node:fs'; export function get(req){const name=req.params.name;if(!/^[a-z]+[.](png|jpg)$/.test(name)) return; readFile(name,()=>{});}",
+      "framework": "node-server",
+      "partition": "validation"
+    },
+    {
+      "id": "validation/range-containing-backslash",
+      "rule": "security.server-path-traversal",
+      "expected": 1,
+      "code": "import {readFile} from 'node:fs'; export function get(req){const name=req.params.name;if(!/^[A-z]+$/.test(name)) return; readFile(name,()=>{});}",
+      "framework": "node-server",
+      "partition": "validation"
+    },
+    {
+      "id": "validation/multiline-anchors",
+      "rule": "security.server-path-traversal",
+      "expected": 1,
+      "code": "import {readFile} from 'node:fs'; export function get(req){const name=req.params.name;if(!/^[a-z]+$/m.test(name)) return; readFile(name,()=>{});}",
+      "framework": "node-server",
+      "partition": "validation"
+    },
+    {
+      "id": "validation/short-reassignment",
+      "rule": "security.server-ssrf",
+      "expected": 1,
+      "code": "export function get(req){let a=0;a=req.query.url;return fetch(a);}",
+      "framework": "node-server",
+      "partition": "validation"
+    },
+    {
+      "id": "validation/conditional-safe-write",
+      "rule": "security.server-ssrf",
+      "expected": 1,
+      "code": "export function get(req){let target=req.query.url;if (DEBUG) {target='https://safe.example/';} return fetch(target);}",
+      "framework": "node-server",
+      "partition": "validation"
+    },
+    {
+      "id": "validation/jwt-aliased-verifier",
+      "rule": "security.jwt-validation",
+      "expected": 1,
+      "code": "import {verify as check} from 'jsonwebtoken'; export const value=check(token,undefined,{algorithms:['RS256','none']});",
+      "framework": "node-server",
+      "partition": "validation"
+    },
+    {
+      "id": "validation/jwt-duplicate-effective-option",
+      "rule": "security.jwt-validation",
+      "expected": 0,
+      "code": "import jwt from 'jsonwebtoken'; jwt.verify(token,key,{ignoreExpiration:true,ignoreExpiration:false});",
+      "framework": "node-server",
+      "partition": "validation"
+    },
+    {
+      "id": "validation/jwt-options-comment",
+      "rule": "security.jwt-validation",
+      "expected": 0,
+      "code": "import jwt from 'jsonwebtoken'; jwt.verify(token,key,{/*ignoreExpiration:true*/ algorithms:['RS256']});",
+      "framework": "node-server",
+      "partition": "validation"
+    },
+    {
+      "id": "validation/filename-guard-in-string",
+      "rule": "security.server-path-traversal",
+      "expected": 1,
+      "code": "import {readFile} from 'node:fs'; export function get(req){const target=req.params.name;const help=\"if (!/^[a-z]+$/.test(target)) return\";readFile(target,()=>{});}",
+      "framework": "node-server",
+      "partition": "validation"
+    }
+  ]
+}

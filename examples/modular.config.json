@@ -1,0 +1,7 @@
+{
+  "$schema": "../modular.schema.json",
+  "failOn": "high",
+  "failOnIncomplete": true,
+  "maxFindingsPerRule": 100,
+  "outputFormats": ["json", "sarif"]
+}
