@@ -63,7 +63,7 @@
     "prepublishOnly": "npm run release:check"
   },
   "devDependencies": {
-    "@axe-core/playwright": "4.13.0",
+    "@axe-core/playwright": "4.14.0",
     "playwright": "1.63.0",
     "typescript": "5.9.2"
   },
